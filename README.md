@@ -216,7 +216,7 @@ The script automatically chooses the best layout:
 ### Tips for Best Results
 
 ✅ **Do:**
-- Start with 4-6 tickers
+- Start with 4-6 tickers.  (4 is the best option)
 - Use tickers you actively monitor
 - Mix different asset types
 - Update regularly based on strategy
