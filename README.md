@@ -319,18 +319,6 @@ cd ~/TradingViewLauncher
 
 ---
 
-## 📊 Comparison: Basic vs Enhanced
-
-| Feature | Basic (v1.0) | **Enhanced (v2.0)** |
-|---------|--------------|---------------------|
-| Number of windows | Fixed (4) | **Dynamic (1-20+)** |
-| Ticker configuration | Edit Python code | **Edit tickers.txt** |
-| Layout options | 2×2 only | **Auto-optimized** |
-| Ease of customization | Medium | **Very Easy** |
-| Best for | Beginners | **Everyone** |
-
----
-
 ## 🎓 Examples & Use Cases
 
 ### Day Trader
@@ -395,28 +383,9 @@ TradingViewLauncher/
 ├── launch.command              # Launcher (macOS)
 └── Launch TradingView.bat      # Launcher (Windows)
 ```
-
----
-
-## 🔄 Updates & Changelog
-
-### Version 2.0.0 (Enhanced)
-- ✅ Added tickers.txt configuration
-- ✅ Dynamic window count support
-- ✅ Smart layout optimization
-- ✅ Better error handling
-- ✅ Improved user feedback
-
-### Version 1.0.0 (Basic)
-- ✅ Fixed 4-window setup
-- ✅ Rectangle integration (macOS)
-- ✅ Chart reset functionality
-
----
-
 ## 💡 Pro Tips
 
-1. **Start Small:** Begin with 4 tickers, expand as needed
+1. **Start Small:** Begin with 4 tickers, expand as needed WORKS BEST!
 2. **Group by Strategy:** Create ticker files for different setups
 3. **Update Daily:** Adjust tickers based on market conditions
 4. **Use Comments:** Document why you're watching each ticker
@@ -443,3 +412,6 @@ MIT License - Free to use, modify, and distribute!
 **Happy Trading! 📈📊💰**
 
 *Disclaimer: This tool is for convenience only. Not affiliated with TradingView. Always do your own research and trade responsibly.*
+
+Happy trading, 
+Ogi
