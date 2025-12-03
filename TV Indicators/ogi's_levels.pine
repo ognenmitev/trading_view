@@ -120,7 +120,7 @@ shortTP2 = close - (shortRisk * tpRatio2)
 var float yesterdayHigh = na
 var float yesterdayLow = na
 
-if ta.change(time("D"))
+if ta.change(time("D")) != 0
     yesterdayHigh := high[1]
     yesterdayLow := low[1]
     // Update with highest high and lowest low from previous day
