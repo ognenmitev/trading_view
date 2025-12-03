@@ -1,0 +1,222 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ognenmitev
+
+//@version=6
+indicator("Candlestick Patterns", overlay=true, max_labels_count=100)
+
+// INPUTS
+showBullish = input.bool(true, "Show Bullish Patterns", group="Display")
+showBearish = input.bool(true, "Show Bearish Patterns", group="Display")
+showLabels = input.bool(true, "Show Pattern Names", group="Display")
+sensitivity = input.string("Normal", "Sensitivity", options=["Strict", "Normal", "Relaxed"], group="Settings")
+
+// SENSITIVITY MULTIPLIERS
+strictMult = sensitivity == "Strict" ? 0.8 : sensitivity == "Normal" ? 1.0 : 1.2
+
+// CANDLE MEASUREMENTS
+bodySize = math.abs(close - open)
+upperWick = high - math.max(close, open)
+lowerWick = math.min(close, open) - low
+fullRange = high - low
+avgBody = ta.sma(bodySize, 14)
+avgRange = ta.atr(14)
+
+isBullish = close > open
+isBearish = close < open
+smallBody = bodySize < avgBody * 0.3 * strictMult
+largeBody = bodySize > avgBody * 1.5 * strictMult
+longUpperWick = upperWick > bodySize * 2
+longLowerWick = lowerWick > bodySize * 2
+
+// PREVIOUS CANDLE DATA
+prevOpen = open[1]
+prevClose = close[1]
+prevHigh = high[1]
+prevLow = low[1]
+prevBodySize = math.abs(prevClose - prevOpen)
+prevBullish = prevClose > prevOpen
+prevBearish = prevClose < prevOpen
+
+// =============================================================================
+// BULLISH CANDLESTICK PATTERNS
+// =============================================================================
+
+// HAMMER (bullish reversal)
+// Small body at top, long lower wick, appears after downtrend
+isHammer = isBullish and longLowerWick and upperWick < bodySize and close > (high - fullRange * 0.3) and close[1] < open[1]
+
+// INVERTED HAMMER (bullish reversal)
+// Small body at bottom, long upper wick, appears after downtrend
+isInvertedHammer = smallBody and longUpperWick and lowerWick < bodySize and close[1] < open[1]
+
+// BULLISH ENGULFING (bullish reversal)
+// Large bullish candle fully engulfs previous bearish candle
+isBullishEngulfing = isBullish and prevBearish and open <= prevClose and close >= prevOpen and bodySize > prevBodySize
+
+// MORNING STAR (bullish reversal - 3 candles)
+// Large bear, small body, large bull
+isMorningStar = close[2] < open[2] and smallBody[1] and isBullish and close > (open[2] + close[2]) / 2 and math.abs(close[2] - open[2]) > avgBody
+
+// PIERCING PATTERN (bullish reversal)
+// Bullish candle closes above midpoint of previous bearish candle
+isPiercing = isBullish and prevBearish and open < prevLow and close > (prevOpen + prevClose) / 2 and close < prevOpen
+
+// THREE WHITE SOLDIERS (strong bullish continuation)
+// Three consecutive bullish candles with higher closes
+isThreeWhiteSoldiers = isBullish and close[1] > open[1] and close[2] > open[2] and close > close[1] and close[1] > close[2] and open > open[1] and open[1] > open[2]
+
+// BULLISH HARAMI (bullish reversal)
+// Small bullish candle inside previous large bearish candle
+isBullishHarami = isBullish and prevBearish and open > prevClose and close < prevOpen and bodySize < prevBodySize * 0.5
+
+// DRAGONFLY DOJI (bullish reversal)
+// Very small body, long lower wick, no upper wick
+isDragonflyDoji = smallBody and lowerWick > bodySize * 3 and upperWick < bodySize and close[1] < open[1]
+
+// =============================================================================
+// BEARISH CANDLESTICK PATTERNS
+// =============================================================================
+
+// HANGING MAN (bearish reversal)
+// Small body at top, long lower wick, appears after uptrend
+isHangingMan = isBearish and longLowerWick and upperWick < bodySize and close < (high - fullRange * 0.7) and close[1] > open[1]
+
+// SHOOTING STAR (bearish reversal)
+// Small body at bottom, long upper wick, appears after uptrend
+isShootingStar = smallBody and longUpperWick and lowerWick < bodySize and close[1] > open[1]
+
+// BEARISH ENGULFING (bearish reversal)
+// Large bearish candle fully engulfs previous bullish candle
+isBearishEngulfing = isBearish and prevBullish and open >= prevClose and close <= prevOpen and bodySize > prevBodySize
+
+// EVENING STAR (bearish reversal - 3 candles)
+// Large bull, small body, large bear
+isEveningStar = close[2] > open[2] and smallBody[1] and isBearish and close < (open[2] + close[2]) / 2 and math.abs(close[2] - open[2]) > avgBody
+
+// DARK CLOUD COVER (bearish reversal)
+// Bearish candle closes below midpoint of previous bullish candle
+isDarkCloud = isBearish and prevBullish and open > prevHigh and close < (prevOpen + prevClose) / 2 and close > prevOpen
+
+// THREE BLACK CROWS (strong bearish continuation)
+// Three consecutive bearish candles with lower closes
+isThreeBlackCrows = isBearish and close[1] < open[1] and close[2] < open[2] and close < close[1] and close[1] < close[2] and open < open[1] and open[1] < open[2]
+
+// BEARISH HARAMI (bearish reversal)
+// Small bearish candle inside previous large bullish candle
+isBearishHarami = isBearish and prevBullish and open < prevClose and close > prevOpen and bodySize < prevBodySize * 0.5
+
+// GRAVESTONE DOJI (bearish reversal)
+// Very small body, long upper wick, no lower wick
+isGravestoneDoji = smallBody and upperWick > bodySize * 3 and lowerWick < bodySize and close[1] > open[1]
+
+// =============================================================================
+// BREAK AND RETEST DETECTION
+// =============================================================================
+
+// Track recent support/resistance breaks
+var float brokenResistance = na
+var float brokenSupport = na
+var int breakBar = 0
+
+// Detect resistance break
+resistanceLevel = ta.highest(high, 20)
+if close > resistanceLevel[1] and close[1] <= resistanceLevel[1]
+    brokenResistance := resistanceLevel[1]
+    breakBar := bar_index
+
+// Detect support break
+supportLevel = ta.lowest(low, 20)
+if close < supportLevel[1] and close[1] >= supportLevel[1]
+    brokenSupport := supportLevel[1]
+    breakBar := bar_index
+
+// BULLISH RETEST (price broke resistance, pulled back, now retesting)
+isBullishRetest = false
+if not na(brokenResistance) and (bar_index - breakBar) < 20
+    // Price pulled back to broken resistance
+    if low <= brokenResistance * 1.01 and low >= brokenResistance * 0.99
+        // Bullish candle bouncing off the level
+        if isBullish and close > open
+            isBullishRetest := true
+
+// BEARISH RETEST (price broke support, bounced back, now retesting)
+isBearishRetest = false
+if not na(brokenSupport) and (bar_index - breakBar) < 20
+    // Price bounced back to broken support
+    if high >= brokenSupport * 0.99 and high <= brokenSupport * 1.01
+        // Bearish candle rejecting the level
+        if isBearish and close < open
+            isBearishRetest := true
+
+// Clear old breaks
+if bar_index - breakBar > 20
+    brokenResistance := na
+    brokenSupport := na
+
+// =============================================================================
+// NEUTRAL PATTERNS
+// =============================================================================
+
+// DOJI (indecision)
+// Very small body, equal wicks
+isDoji = smallBody and math.abs(upperWick - lowerWick) < fullRange * 0.3
+
+// SPINNING TOP (indecision)
+// Small body in middle, similar wicks on both sides
+isSpinningTop = smallBody and upperWick > bodySize and lowerWick > bodySize and not isDoji
+
+// =============================================================================
+// PLOT SIGNALS
+// =============================================================================
+
+// BREAK & RETEST - Most important signals!
+plotshape(isBullishRetest, "Bull Retest", shape.circle, location.belowbar, color.new(color.aqua, 0), text="RETEST ↑", size=size.normal)
+plotshape(isBearishRetest, "Bear Retest", shape.circle, location.abovebar, color.new(color.orange, 0), text="RETEST ↓", size=size.normal)
+
+// BULLISH PATTERNS
+// BULLISH PATTERNS
+plotshape(showBullish and isHammer, "Hammer", shape.labelup, location.belowbar, color.new(color.lime, 0), text="HAMMER", size=size.small)
+plotshape(showBullish and isInvertedHammer, "Inv Hammer", shape.labelup, location.belowbar, color.new(color.lime, 20), size=size.tiny, text="INV HAMMER")
+plotshape(showBullish and isBullishEngulfing, "Bull Engulf", shape.labelup, location.belowbar, color.new(color.green, 0), size=size.normal, text="ENGULF ↑")
+plotshape(showBullish and isMorningStar, "Morning Star", shape.labelup, location.belowbar, color.new(color.lime, 0), size=size.normal, text="MORNING★")
+plotshape(showBullish and isPiercing, "Piercing", shape.labelup, location.belowbar, color.new(color.green, 20), size=size.tiny, text="PIERCE")
+plotshape(showBullish and isThreeWhiteSoldiers, "3 White", shape.labelup, location.belowbar, color.new(color.lime, 0), size=size.normal, text="3 BULLS")
+plotshape(showBullish and isBullishHarami, "Bull Harami", shape.labelup, location.belowbar, color.new(color.green, 30), size=size.tiny, text="HARAMI↑")
+plotshape(showBullish and isDragonflyDoji, "Dragonfly", shape.labelup, location.belowbar, color.new(color.lime, 20), size=size.tiny, text="DFLY")
+
+// BEARISH PATTERNS
+plotshape(showBearish and isHangingMan, "Hanging Man", shape.labeldown, location.abovebar, color.new(color.orange, 0), text="HANG MAN", size=size.small)
+plotshape(showBearish and isShootingStar, "Shooting Star", shape.labeldown, location.abovebar, color.new(color.orange, 20), size=size.tiny, text="SHOOT★")
+plotshape(showBearish and isBearishEngulfing, "Bear Engulf", shape.labeldown, location.abovebar, color.new(color.red, 0), size=size.normal, text="ENGULF ↓")
+plotshape(showBearish and isEveningStar, "Evening Star", shape.labeldown, location.abovebar, color.new(color.orange, 0), size=size.normal, text="EVENING★")
+plotshape(showBearish and isDarkCloud, "Dark Cloud", shape.labeldown, location.abovebar, color.new(color.red, 20), size=size.tiny, text="DARK☁")
+plotshape(showBearish and isThreeBlackCrows, "3 Black", shape.labeldown, location.abovebar, color.new(color.red, 0), size=size.normal, text="3 BEARS")
+plotshape(showBearish and isBearishHarami, "Bear Harami", shape.labeldown, location.abovebar, color.new(color.red, 30), size=size.tiny, text="HARAMI↓")
+plotshape(showBearish and isGravestoneDoji, "Gravestone", shape.labeldown, location.abovebar, color.new(color.orange, 20), size=size.tiny, text="GRAVE")
+
+// NEUTRAL PATTERNS
+plotshape(isDoji and not (isDragonflyDoji or isGravestoneDoji), "Doji", shape.diamond, location.abovebar, color.new(color.gray, 50), size=size.tiny, text="DOJI")
+
+// BACKGROUND COLORING
+bgcolor(isBullishRetest ? color.new(color.aqua, 90) : na, title="Bullish Retest")
+bgcolor(isBearishRetest ? color.new(color.orange, 90) : na, title="Bearish Retest")
+bgcolor(isHammer or isBullishEngulfing or isMorningStar ? color.new(color.lime, 95) : na)
+bgcolor(isShootingStar or isBearishEngulfing or isEveningStar ? color.new(color.red, 95) : na)
+
+// =============================================================================
+// ALERTS
+// =============================================================================
+
+// BREAK & RETEST - Critical trading signals
+alertcondition(isBullishRetest, "Bullish Retest", "Bullish Break & Retest - HIGH PROBABILITY BUY")
+alertcondition(isBearishRetest, "Bearish Retest", "Bearish Break & Retest - HIGH PROBABILITY SELL")
+
+// Strong reversal patterns
+alertcondition(isHammer, "Hammer", "Hammer pattern - Bullish reversal")
+alertcondition(isBullishEngulfing, "Bullish Engulfing", "Bullish Engulfing - Strong reversal")
+alertcondition(isMorningStar, "Morning Star", "Morning Star - Major bullish reversal")
+alertcondition(isShootingStar, "Shooting Star", "Shooting Star - Bearish reversal")
+alertcondition(isBearishEngulfing, "Bearish Engulfing", "Bearish Engulfing - Strong reversal")
+alertcondition(isEveningStar, "Evening Star", "Evening Star - Major bearish reversal")
+alertcondition(isThreeWhiteSoldiers, "Three White Soldiers", "Three White Soldiers - Strong bullish")
+alertcondition(isThreeBlackCrows, "Three Black Crows", "Three Black Crows - Strong bearish")

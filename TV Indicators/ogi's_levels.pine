@@ -1,0 +1,248 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ognenmitev
+
+//@version=6
+indicator("Ogi's Levels", overlay=true, max_boxes_count=100, max_lines_count=100)
+
+// ============================================================================
+// INPUTS
+// ============================================================================
+
+// Support/Resistance®
+pivotStrength = input.int(10, "Pivot Strength", minval=3, maxval=30, group="Support & Resistance")
+maxLevels = input.int(3, "Number of Levels", minval=1, maxval=8, group="Support & Resistance")
+boxExtend = input.int(50, "Box Extension", minval=10, maxval=100, group="Support & Resistance")
+srBoxHeight = input.float(0.3, "Box Height (ATR)", minval=0.1, maxval=1.0, step=0.1, group="Support & Resistance")
+
+// Stop Loss & Take Profit
+enableSLTP = input.bool(true, "Show SL/TP Lines", group="Stop Loss & Take Profit")
+slAtrMult = input.float(2.0, "SL ATR Multiplier", minval=0.5, maxval=5.0, step=0.5, group="Stop Loss & Take Profit")
+tpRatio1 = input.float(2.0, "TP1 Risk:Reward", minval=1.0, maxval=5.0, step=0.5, group="Stop Loss & Take Profit")
+tpRatio2 = input.float(3.0, "TP2 Risk:Reward", minval=1.5, maxval=8.0, step=0.5, group="Stop Loss & Take Profit")
+
+// Colors
+supportCol = input.color(color.new(color.green, 50), "Support Color", group="Colors")
+resistanceCol = input.color(color.new(color.red, 50), "Resistance Color", group="Colors")
+slCol = input.color(color.red, "Stop Loss Color", group="Colors")
+tp1Col = input.color(color.green, "TP1 Color", group="Colors")
+tp2Col = input.color(color.lime, "TP2 Color", group="Colors")
+
+// Trend Indicator
+enableTrend = input.bool(true, "Show Trend Indicator", group="Trend")
+fastMA = input.int(50, "Fast MA Period", minval=10, maxval=100, group="Trend")
+slowMA = input.int(200, "Slow MA Period", minval=50, maxval=300, group="Trend")
+
+// Yesterday's Levels & ATH
+enableYesterdayLevels = input.bool(true, "Show Yesterday's HH/HL", group="Yesterday's Levels")
+enableATH = input.bool(true, "Show All-Time High", group="Yesterday's Levels")
+purpleCol = input.color(color.new(color.purple, 30), "Purple Line Color", group="Yesterday's Levels")
+
+// ============================================================================
+// CALCULATIONS
+// ============================================================================
+
+// ATR for box sizing
+atr = ta.atr(14)
+
+// Trend Detection
+smaFast = ta.sma(close, fastMA)
+smaSlow = ta.sma(close, slowMA)
+priceAboveFast = close > smaFast
+priceAboveSlow = close > smaSlow
+maUptrend = smaFast > smaSlow
+maMomentum = smaFast - smaFast[10]
+
+// Determine overall trend
+isBullish = priceAboveFast and priceAboveSlow and maUptrend and maMomentum > 0
+isBearish = close < smaFast and close < smaSlow and not maUptrend and maMomentum < 0
+isNeutral = not isBullish and not isBearish
+
+trendText = isBullish ? "UPTREND ▲" : isBearish ? "DOWNTREND ▼" : "SIDEWAYS ●"
+trendColor = isBullish ? color.new(color.green, 0) : isBearish ? color.new(color.red, 0) : color.new(color.orange, 0)
+
+// Detect Pivots
+pivotHigh = ta.pivothigh(high, pivotStrength, pivotStrength)
+pivotLow = ta.pivotlow(low, pivotStrength, pivotStrength)
+
+// Store levels
+var resistanceLevels = array.new<float>()
+var supportLevels = array.new<float>()
+var resistanceBars = array.new<int>()
+var supportBars = array.new<int>()
+
+// Add resistance
+if not na(pivotHigh)
+    array.push(resistanceLevels, pivotHigh)
+    array.push(resistanceBars, bar_index[pivotStrength])
+    if array.size(resistanceLevels) > maxLevels
+        array.shift(resistanceLevels)
+        array.shift(resistanceBars)
+
+// Add support
+if not na(pivotLow)
+    array.push(supportLevels, pivotLow)
+    array.push(supportBars, bar_index[pivotStrength])
+    if array.size(supportLevels) > maxLevels
+        array.shift(supportLevels)
+        array.shift(supportBars)
+
+// Find nearest levels
+var float nearSupport = na
+var float nearResistance = na
+
+if array.size(supportLevels) > 0
+    for i = 0 to array.size(supportLevels) - 1
+        level = array.get(supportLevels, i)
+        if level < close and (na(nearSupport) or level > nearSupport)
+            nearSupport := level
+
+if array.size(resistanceLevels) > 0
+    for i = 0 to array.size(resistanceLevels) - 1
+        level = array.get(resistanceLevels, i)
+        if level > close and (na(nearResistance) or level < nearResistance)
+            nearResistance := level
+
+// Calculate SL/TP
+longSL = close - (atr * slAtrMult)
+shortSL = close + (atr * slAtrMult)
+longRisk = close - longSL
+shortRisk = shortSL - close
+longTP1 = close + (longRisk * tpRatio1)
+longTP2 = close + (longRisk * tpRatio2)
+shortTP1 = close - (shortRisk * tpRatio1)
+shortTP2 = close - (shortRisk * tpRatio2)
+
+// ============================================================================
+// YESTERDAY'S HIGH/LOW & ALL-TIME HIGH
+// ============================================================================
+
+// Get yesterday's high and low
+var float yesterdayHigh = na
+var float yesterdayLow = na
+
+if ta.change(time("D"))
+    yesterdayHigh := high[1]
+    yesterdayLow := low[1]
+    // Update with highest high and lowest low from previous day
+    for i = 1 to 100
+        if not na(high[i]) and dayofmonth(time[i]) == dayofmonth(time[1])
+            yesterdayHigh := math.max(yesterdayHigh, high[i])
+            yesterdayLow := math.min(yesterdayLow, low[i])
+        else
+            break
+
+// Calculate All-Time High
+var float allTimeHigh = high
+if high > allTimeHigh
+    allTimeHigh := high
+
+// ============================================================================
+// DRAW SUPPORT/RESISTANCE BOXES
+// ============================================================================
+
+if barstate.islast
+    // Draw Resistance Boxes
+    for i = 0 to array.size(resistanceLevels) - 1
+        level = array.get(resistanceLevels, i)
+        startBar = array.get(resistanceBars, i)
+        top = level + (atr * srBoxHeight)
+        bottom = level - (atr * srBoxHeight)
+        box.new(startBar, top, bar_index + boxExtend, bottom, border_color=resistanceCol, bgcolor=color.new(resistanceCol, 85), border_width=2)
+        label.new(bar_index + 5, level, "R" + str.tostring(i + 1) + "\n" + str.tostring(math.round(level, 2)), style=label.style_label_left, color=color.new(color.red, 30), textcolor=color.white, size=size.small)
+    
+    // Draw Support Boxes
+    for i = 0 to array.size(supportLevels) - 1
+        level = array.get(supportLevels, i)
+        startBar = array.get(supportBars, i)
+        top = level + (atr * srBoxHeight)
+        bottom = level - (atr * srBoxHeight)
+        box.new(startBar, top, bar_index + boxExtend, bottom, border_color=supportCol, bgcolor=color.new(supportCol, 85), border_width=2)
+        label.new(bar_index + 5, level, "S" + str.tostring(i + 1) + "\n" + str.tostring(math.round(level, 2)), style=label.style_label_left, color=color.new(color.green, 30), textcolor=color.white, size=size.small)
+
+// ============================================================================
+// DRAW YESTERDAY'S LEVELS & ATH
+// ============================================================================
+
+if barstate.islast
+    // Yesterday's High
+    if enableYesterdayLevels and not na(yesterdayHigh)
+        line.new(bar_index - 50, yesterdayHigh, bar_index + boxExtend, yesterdayHigh, color=purpleCol, width=2, style=line.style_solid)
+        label.new(bar_index + boxExtend + 2, yesterdayHigh, "Y-HH\n" + str.tostring(math.round(yesterdayHigh, 2)), style=label.style_label_left, color=purpleCol, textcolor=color.white, size=size.small)
+    
+    // Yesterday's Low
+    if enableYesterdayLevels and not na(yesterdayLow)
+        line.new(bar_index - 50, yesterdayLow, bar_index + boxExtend, yesterdayLow, color=purpleCol, width=2, style=line.style_solid)
+        label.new(bar_index + boxExtend + 2, yesterdayLow, "Y-LL\n" + str.tostring(math.round(yesterdayLow, 2)), style=label.style_label_left, color=purpleCol, textcolor=color.white, size=size.small)
+    
+    // All-Time High
+    if enableATH
+        line.new(bar_index - 100, allTimeHigh, bar_index + boxExtend, allTimeHigh, color=color.new(color.purple, 0), width=3, style=line.style_dashed)
+        label.new(bar_index + boxExtend + 2, allTimeHigh, "ATH\n" + str.tostring(math.round(allTimeHigh, 2)), style=label.style_label_left, color=color.new(color.purple, 0), textcolor=color.white, size=size.normal)
+
+// ============================================================================
+// DRAW SL/TP LINES
+// ============================================================================
+
+if enableSLTP and barstate.islast
+    // Long Position Lines
+    line.new(bar_index - 5, longSL, bar_index + boxExtend, longSL, color=slCol, width=3, style=line.style_solid)
+    line.new(bar_index - 5, longTP1, bar_index + boxExtend, longTP1, color=tp1Col, width=2, style=line.style_dashed)
+    line.new(bar_index - 5, longTP2, bar_index + boxExtend, longTP2, color=tp2Col, width=2, style=line.style_dotted)
+    
+    // Short Position Lines
+    line.new(bar_index - 5, shortSL, bar_index + boxExtend, shortSL, color=slCol, width=3, style=line.style_solid)
+    line.new(bar_index - 5, shortTP1, bar_index + boxExtend, shortTP1, color=tp1Col, width=2, style=line.style_dashed)
+    line.new(bar_index - 5, shortTP2, bar_index + boxExtend, shortTP2, color=tp2Col, width=2, style=line.style_dotted)
+    
+    // Labels for Long
+    label.new(bar_index + boxExtend + 2, longSL, "LONG SL\n" + str.tostring(math.round(longSL, 2)), style=label.style_label_left, color=slCol, textcolor=color.white, size=size.small)
+    label.new(bar_index + boxExtend + 2, longTP1, "TP1\n" + str.tostring(math.round(longTP1, 2)), style=label.style_label_left, color=tp1Col, textcolor=color.white, size=size.tiny)
+    label.new(bar_index + boxExtend + 2, longTP2, "TP2\n" + str.tostring(math.round(longTP2, 2)), style=label.style_label_left, color=tp2Col, textcolor=color.white, size=size.tiny)
+    
+    // Labels for Short
+    label.new(bar_index + boxExtend + 2, shortSL, "SHORT SL\n" + str.tostring(math.round(shortSL, 2)), style=label.style_label_left, color=slCol, textcolor=color.white, size=size.small)
+    label.new(bar_index + boxExtend + 2, shortTP1, "TP1\n" + str.tostring(math.round(shortTP1, 2)), style=label.style_label_left, color=tp1Col, textcolor=color.white, size=size.tiny)
+    label.new(bar_index + boxExtend + 2, shortTP2, "TP2\n" + str.tostring(math.round(shortTP2, 2)), style=label.style_label_left, color=tp2Col, textcolor=color.white, size=size.tiny)
+
+// ============================================================================
+// TREND INDICATOR (Upper Right Corner)
+// ============================================================================
+
+if enableTrend and barstate.islast
+    // Create a table for the trend indicator in upper right corner
+    var table trendTable = table.new(position.top_right, 1, 1)
+    table.cell(trendTable, 0, 0, trendText, bgcolor=trendColor, text_color=color.white, text_size=size.large)
+
+// ============================================================================
+// CURRENT PRICE LINE
+// ============================================================================
+
+if barstate.islast
+    line.new(bar_index - 20, close, bar_index + boxExtend, close, color=color.new(color.white, 50), width=1, style=line.style_solid)
+    label.new(bar_index, close, "PRICE: " + str.tostring(math.round(close, 2)), style=label.style_label_left, color=color.new(color.blue, 60), textcolor=color.white, size=size.normal)
+
+// ============================================================================
+// VISUAL ALERTS (WITHOUT TRIANGLES)
+// ============================================================================
+
+// Price near S/R
+nearSupp = not na(nearSupport) and low <= nearSupport * 1.005 and low >= nearSupport * 0.995
+nearRes = not na(nearResistance) and high >= nearResistance * 0.995 and high <= nearResistance * 1.005
+
+bgcolor(nearSupp ? color.new(color.green, 95) : na, title="Near Support")
+bgcolor(nearRes ? color.new(color.red, 95) : na, title="Near Resistance")
+
+// Triangles removed - plotshape lines commented out
+// plotshape(nearSupp, "At Support", shape.triangleup, location.belowbar, color.green, size=size.small, text="SUP")
+// plotshape(nearRes, "At Resistance", shape.triangledown, location.abovebar, color.red, size=size.small, text="RES")
+
+// ============================================================================
+// ALERTS
+// ============================================================================
+
+alertcondition(nearSupp, "Price at Support", "Price reached support level")
+alertcondition(nearRes, "Price at Resistance", "Price reached resistance level")
+alertcondition(close <= longSL, "Long SL Hit", "Price hit long stop loss level")
+alertcondition(close >= longTP1, "Long TP1 Hit", "Price hit long take profit 1")
+alertcondition(close >= shortSL, "Short SL Hit", "Price hit short stop loss level")
+alertcondition(close <= shortTP1, "Short TP1 Hit", "Price hit short take profit 1")
