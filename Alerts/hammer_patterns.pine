@@ -1,0 +1,131 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ognenmitev - Modified for Hammer Patterns Only
+
+//@version=6
+indicator("Hammer & Inverted Hammer Patterns", overlay=true, max_labels_count=100)
+
+// INPUTS
+showBullishHammer = input.bool(true, "Show Bullish Hammer", group="Hammer Patterns")
+showInvertedHammer = input.bool(true, "Show Inverted Hammer", group="Hammer Patterns")
+showBearishHammer = input.bool(true, "Show Bearish Hammer (Hanging Man)", group="Hammer Patterns")
+showShootingStar = input.bool(true, "Show Shooting Star (Inverted Bearish)", group="Hammer Patterns")
+sensitivity = input.string("Normal", "Sensitivity", options=["Strict", "Normal", "Relaxed"], group="Settings")
+wickMultiplier = input.float(2.0, "Wick to Body Ratio", minval=1.5, maxval=4.0, step=0.5, group="Settings")
+useTimeframeFilter = input.bool(true, "Only Show on 2-Minute Chart", group="Settings")
+
+// TIMEFRAME CHECK
+is2MinChart = timeframe.period == "2"
+showPatterns = not useTimeframeFilter or is2MinChart
+
+// SENSITIVITY MULTIPLIERS
+strictMult = sensitivity == "Strict" ? 0.8 : sensitivity == "Normal" ? 1.0 : 1.2
+
+// CANDLE MEASUREMENTS
+bodySize = math.abs(close - open)
+upperWick = high - math.max(close, open)
+lowerWick = math.min(close, open) - low
+fullRange = high - low
+avgBody = ta.sma(bodySize, 14)
+avgRange = ta.atr(14)
+
+isBullish = close > open
+isBearish = close < open
+smallBody = bodySize < avgBody * 0.5 * strictMult
+
+// Dynamic wick checks
+longUpperWick = upperWick > bodySize * wickMultiplier
+longLowerWick = lowerWick > bodySize * wickMultiplier
+
+// =============================================================================
+// HAMMER PATTERN DETECTION
+// =============================================================================
+
+// BULLISH HAMMER (bullish reversal)
+// Small body at top, long lower wick, appears after downtrend
+// Body should be in upper part of the candle
+isBullishHammer = longLowerWick and 
+                  upperWick < bodySize * strictMult and 
+                  close > (high - fullRange * 0.3) and 
+                  close[1] < open[1] and
+                  lowerWick > fullRange * 0.6
+
+// INVERTED HAMMER (bullish reversal)
+// Small body at bottom, long upper wick, appears after downtrend
+// Body should be in lower part of the candle
+isInvertedHammer = longUpperWick and 
+                   lowerWick < bodySize * strictMult and 
+                   close < (low + fullRange * 0.3) and
+                   close[1] < open[1] and
+                   upperWick > fullRange * 0.6
+
+// HANGING MAN / BEARISH HAMMER (bearish reversal)
+// Same as hammer but appears after uptrend
+// Small body at top, long lower wick
+isHangingMan = longLowerWick and 
+               upperWick < bodySize * strictMult and 
+               close < (high - fullRange * 0.7) and 
+               close[1] > open[1] and
+               lowerWick > fullRange * 0.6
+
+// SHOOTING STAR / INVERTED BEARISH HAMMER (bearish reversal)
+// Same as inverted hammer but appears after uptrend
+// Small body at bottom, long upper wick
+isShootingStar = longUpperWick and 
+                 lowerWick < bodySize * strictMult and 
+                 close[1] > open[1] and
+                 upperWick > fullRange * 0.6
+
+// =============================================================================
+// PLOT SIGNALS
+// =============================================================================
+
+// BULLISH PATTERNS (Green/Lime colors)
+plotshape(showPatterns and showBullishHammer and isBullishHammer, 
+          title="Bullish Hammer", 
+          style=shape.labelup, 
+          location=location.belowbar, 
+          color=color.new(color.lime, 0), 
+          text="HAMMER ↑", 
+          size=size.normal)
+
+plotshape(showPatterns and showInvertedHammer and isInvertedHammer, 
+          title="Inverted Hammer", 
+          style=shape.labelup, 
+          location=location.belowbar, 
+          color=color.new(color.green, 0), 
+          text="INV HAMMER ↑", 
+          size=size.normal)
+
+// BEARISH PATTERNS (Red/Orange colors)
+plotshape(showPatterns and showBearishHammer and isHangingMan, 
+          title="Hanging Man", 
+          style=shape.labeldown, 
+          location=location.abovebar, 
+          color=color.new(color.orange, 0), 
+          text="HAMMER ↓", 
+          size=size.normal)
+
+plotshape(showPatterns and showShootingStar and isShootingStar, 
+          title="Shooting Star", 
+          style=shape.labeldown, 
+          location=location.abovebar, 
+          color=color.new(color.red, 0), 
+          text="INV HAMMER ↓", 
+          size=size.normal)
+
+// BACKGROUND COLORING (subtle)
+bgcolor(showPatterns and (isBullishHammer or isInvertedHammer) ? color.new(color.lime, 95) : na, title="Bullish Hammer Background")
+bgcolor(showPatterns and (isHangingMan or isShootingStar) ? color.new(color.red, 95) : na, title="Bearish Hammer Background")
+
+// =============================================================================
+// ALERTS
+// =============================================================================
+
+alertcondition(isBullishHammer, "Bullish Hammer", "Bullish Hammer detected - Potential reversal UP")
+alertcondition(isInvertedHammer, "Inverted Hammer", "Inverted Hammer detected - Potential reversal UP")
+alertcondition(isHangingMan, "Hanging Man", "Hanging Man detected - Potential reversal DOWN")
+alertcondition(isShootingStar, "Shooting Star", "Shooting Star detected - Potential reversal DOWN")
+
+// Combined alerts
+alertcondition(isBullishHammer or isInvertedHammer, "Any Bullish Hammer", "Bullish Hammer Pattern - Consider LONG")
+alertcondition(isHangingMan or isShootingStar, "Any Bearish Hammer", "Bearish Hammer Pattern - Consider SHORT")
