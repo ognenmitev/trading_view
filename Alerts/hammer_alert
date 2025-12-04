@@ -1,0 +1,23 @@
+{
+  "embeds": [
+    {
+      "title": "TradingView Alert",
+      "description": "Hammer Candle!",
+      "color": 15258703,
+      "fields": [
+        {
+          "name": "Ticker",
+          "value": "[{{ticker}}](https://www.tradingview.com/symbols/{{ticker}}/)"
+        },
+        {
+          "name": "Price",
+          "value": "{{close}}"
+        },
+        {
+          "name": "Time",
+          "value": "{{time}}"
+        }
+      ]
+    }
+  ]
+}
